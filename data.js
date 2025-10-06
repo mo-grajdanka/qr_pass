@@ -1,4 +1,3 @@
-<script>
 
   window.PROFILES = [
     {
@@ -22,4 +21,5 @@
       valid_to:   "2025-10-06T18:00:00Z"
     }
   ];
-</script>
+
+
