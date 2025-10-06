@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Проверка пропуска</title>
+  <style>
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#111; color:#fff; }
+    .wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px; }
+    .card { width:100%; max-width:520px; border-radius:20px; padding:24px; background:#1b1b1b; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+    .status-ok    { background:#0f5132; }
+    .status-deny  { background:#5a1a19; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:999px; font-weight:600; margin-bottom:12px; }
+    .badge-ok   { background:#198754; }
+    .badge-deny { background:#dc3545; }
+    .row { display:flex; gap:16px; align-items:center; }
+    .photo { width:120px; height:120px; border-radius:12px; object-fit:cover; background:#333; }
+    .big { font-size:28px; font-weight:800; margin:0 0 6px; }
+    .muted { color:#bbb; }
+    .kv { margin-top:16px; line-height:1.7; }
+    .kv b { color:#ddd; }
+    .footer { margin-top:18px; font-size:14px; color:#9a9a9a; }
+  </style>
+</head>
+<body>
+  <!-- подключаем данные -->
+  <script src="data.js"></script>
+
+  <div class="wrap">
+    <div id="card" class="card">
+      <div id="badge" class="badge">Проверка…</div>
+      <div class="row">
+        <img id="photo" class="photo" alt="Фото">
+        <div>
+          <h1 id="title" class="big">—</h1>
+          <div id="subtitle" class="muted">—</div>
+        </div>
+      </div>
+
+      <div class="kv">
+        <div><b>Арендатор:</b> <span id="arendator">—</span></div>
+        <div><b>ID:</b> <span id="pid">—</span></div>
+        <div><b>Зона:</b> <span id="zone">—</span></div>
+        <div><b>Действителен до:</b> <span id="valid_to">—</span></div>
+        <div><b>Статус:</b> <span id="status">—</span></div>
+        <div><b>Результат проверки:</b> <span id="result">—</span></div>
+      </div>
+
+      <div class="footer">Покажите экран охраннику.  
+        Если статус «ОТКЛОНЕНО» — обратитесь к администратору.</div>
+    </div>
+  </div>
+
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const id = qs.get('id');
+
+    function fmtLocal(dtIso) {
+      if (!dtIso) return '—';
+      const d = new Date(dtIso);
+      if (Number.isNaN(d.getTime())) return '—';
+      return d.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function denied(reason) { return { allowed:false, reason }; }
+    function allowed() { return { allowed:true, reason:'ok' }; }
+
+    function verifyProfile(profile) {
+      const now = new Date();
+      if (!profile) return denied('Профиль не найден');
+      if (profile.status !== 'active') return denied('Доступ отозван');
+      if (profile.valid_from && now < new Date(profile.valid_from)) return denied('Срок действия ещё не начался');
+      if (profile.valid_to   && now > new Date(profile.valid_to))   return denied('Срок действия истёк');
+      return allowed();
+    }
+
+    function render(p, verdict) {
+      const card   = document.getElementById('card');
+      const badge  = document.getElementById('badge');
+      const photo  = document.getElementById('photo');
+      const title  = document.getElementById('title');
+      const sub    = document.getElementById('subtitle');
+
+      const pid    = document.getElementById('pid');
+      const zone   = document.getElementById('zone');
+      const vto    = document.getElementById('valid_to');
+      const stat   = document.getElementById('status');
+      const result = document.getElementById('result');
+      const arend  = document.getElementById('arendator');
+
+      if (!p) {
+        card.classList.add('status-deny');
+        badge.className = 'badge badge-deny';
+        badge.textContent = 'ОТКЛОНЕНО';
+        title.textContent = 'Профиль не найден';
+        sub.textContent = 'Проверьте QR-код';
+        photo.style.display = 'none';
+        pid.textContent = id || '—';
+        zone.textContent = '—';
+        vto.textContent = '—';
+        stat.textContent = '—';
+        result.textContent = 'Профиль не найден';
+        arend.textContent = '—';
+        return;
+      }
+
+      photo.src = p.photo_url || '';
+      title.textContent = p.name || '—';
+      sub.textContent = `Статус профиля: ${p.status === 'active' ? 'активен' : 'отозван'}`;
+      arend.textContent = p.arendator || '—';
+      pid.textContent = p.id;
+      zone.textContent = p.zone || '—';
+      vto.textContent = fmtLocal(p.valid_to);
+      stat.textContent = p.status === 'active' ? 'Активен' : 'Отозван';
+
+      if (verdict.allowed) {
+        card.classList.add('status-ok');
+        badge.className = 'badge badge-ok';
+        badge.textContent = 'ДОСТУП РАЗРЕШЁН';
+        result.textContent = 'OK';
+      } else {
+        card.classList.add('status-deny');
+        badge.className = 'badge badge-deny';
+        badge.textContent = 'ОТКЛОНЕНО';
+        result.textContent = verdict.reason;
+      }
+    }
+
+    (function init(){
+      const p = (window.PROFILES || []).find(x => x.id === id);
+      const verdict = verifyProfile(p);
+      render(p, verdict);
+    })();
+  </script>
+</body>
+</html>
